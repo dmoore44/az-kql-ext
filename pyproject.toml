@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=70.1.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kql"
+version = "0.1.0"
+description = "Azure CLI extension for executing data-plane KQL queries against Azure Data Explorer (Kusto)"
+authors = [{ name = "Local Extension" }]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "azure-kusto-data==6.0.5",
+]
+dynamic = ["readme"]
+
+[tool.setuptools.dynamic]
+readme = { file = ["README.rst", "HISTORY.rst"], content-type = "text/x-rst" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*", "*.tests*"]
+
+[tool.setuptools.package-data]
+azext_kql = ["azext_metadata.json"]

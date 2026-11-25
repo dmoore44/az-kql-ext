@@ -1,0 +1,66 @@
+name: Release
+
+# Publishing a GitHub Release (tag vX.Y.Z) builds the wheel from the tagged
+# commit and attaches it to that release, so users can install with:
+#   az extension add --source https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/kql-X.Y.Z-py3-none-any.whl
+#
+# workflow_dispatch runs the same build and uploads the wheel as a workflow
+# artifact only. It never touches a release.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-attach:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build
+
+      - name: Check release tag matches pyproject version
+        if: github.event_name == 'release'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Release tag '${GITHUB_REF_NAME}' does not match pyproject.toml version '${version}'. Bump the version or retag."
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} matches pyproject version ${version}"
+
+      - name: Build wheel
+        run: python -m build --wheel --outdir dist .
+
+      - name: Smoke-check the wheel installs and carries extension metadata
+        run: |
+          python -m pip install azure-cli-core dist/*.whl
+          python - <<'EOF'
+          import importlib.resources as resources
+          import azext_kql
+          meta = resources.files("azext_kql").joinpath("azext_metadata.json")
+          assert meta.is_file(), "azext_metadata.json missing from wheel"
+          print("wheel ok:", azext_kql.COMMAND_LOADER_CLS.__name__)
+          EOF
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheel
+          path: dist/*.whl
+          if-no-files-found: error
+
+      - name: Attach wheel to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/*.whl --clobber --repo "$GITHUB_REPOSITORY"
